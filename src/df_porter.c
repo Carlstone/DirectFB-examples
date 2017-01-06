@@ -42,6 +42,9 @@ static IDirectFBSurface *primary;
 /* the temporary surface */
 static IDirectFBSurface *tempsurf;
 
+/* compositing source surface */
+static IDirectFBSurface *sourcesurf;
+
 /* provider for our images/font */
 static IDirectFBFont *font;
 
@@ -112,6 +115,9 @@ int main( int argc, char *argv[] )
      sdsc.height      = screen_height;
 
      DFBCHECK(dfb->CreateSurface( dfb, &sdsc, &tempsurf ));
+     sdsc.width  = 100;
+     sdsc.height = 100;
+     DFBCHECK(dfb->CreateSurface( dfb, &sdsc, &sourcesurf ));
 
 
 
@@ -151,6 +157,13 @@ int main( int argc, char *argv[] )
      DFBCHECK(dfb->CreateFont( dfb, FONT, &fdsc, &font ));
      DFBCHECK(tempsurf->SetFont( tempsurf, font ));
 
+     sourcesurf->SetDrawingFlags( sourcesurf, DSDRAW_SRC_PREMULTIPLY | DSDRAW_BLEND );
+     sourcesurf->Clear( sourcesurf, 0, 0, 0, 0 );
+     sourcesurf->SetPorterDuff( sourcesurf, DSPD_SRC );
+     sourcesurf->SetColor( sourcesurf, 0, 0, 255, 200 );
+     sourcesurf->FillRectangle( sourcesurf, 20, 30, 80, 70 );
+
+     tempsurf->SetBlittingFlags( tempsurf, DSBLIT_BLEND_ALPHACHANNEL );
 
      for (i=0; i<num_rules; i++) {
           int x = (1 + i % 4) * step;
@@ -165,11 +178,10 @@ int main( int argc, char *argv[] )
           tempsurf->FillRectangle( tempsurf, x - 50, y + 100, 80, 70 );
 
           tempsurf->SetPorterDuff( tempsurf, i+1 );
-          tempsurf->SetColor( tempsurf, 0, 0, 255, 200 );
-          tempsurf->FillRectangle( tempsurf, x - 30, y + 130, 80, 70 );
+          tempsurf->Blit(tempsurf, sourcesurf, NULL, x - 50, y + 100);
 
           tempsurf->GetAccelerationMask( tempsurf, NULL, &mask );
-          if (mask & DFXL_FILLRECTANGLE)
+          if (mask & DFXL_BLIT)
                str[0] = '*';
 
           tempsurf->SetPorterDuff( tempsurf, DSPD_SRC_OVER );
@@ -201,6 +213,7 @@ int main( int argc, char *argv[] )
      }
 
      /* release our interfaces to shutdown DirectFB */
+     sourcesurf->Release( sourcesurf );
      tempsurf->Release( tempsurf );
      primary->Release( primary );
      events->Release( events );
